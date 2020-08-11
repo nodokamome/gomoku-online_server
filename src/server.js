@@ -44,8 +44,6 @@ wss.on('connection', function (ws) {
 		console.log(TimeStamp() + "退出しました");
 		connections = connections.filter(function (con, connectionID) {
 			if (con == ws) {
-				console.log(TimeStamp() + "Game_Room[" + i + "] から userID:" + Game_Room[i].BlackPlayer + " が退出しました。");
-
 				//待機中に退出したとき
 				Wait_Room.forEach(function (room, roomID) {
 					if (connectionID == room.connectionID) {
