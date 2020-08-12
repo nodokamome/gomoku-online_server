@@ -42,7 +42,7 @@ wss.on('connection', function (ws) {
 	//切断時
 	ws.on('close', function () {
 		console.log(TimeStamp() + "退出しました");
-		connections = connections.filter(function (con, connectionID) {
+		connections.filter(function (con, connectionID) {
 			if (con == ws) {
 				//待機中に退出したとき
 				Wait_Room.forEach(function (room, roomID) {
@@ -50,6 +50,50 @@ wss.on('connection', function (ws) {
 						Wait_Room[roomID] = 0;
 						console.log(TimeStamp() + "Wait_Room[" + roomID + "] から userID:" + room.userID + " が退出しました。");
 						console.log(TimeStamp() + "Wait_Room:" + JSON.stringify(Wait_Room));
+					}
+				});
+
+				//対戦中に退出したとき
+				Game_Room.forEach(function (room, roomID) {
+					if (connectionID == room.BlackPlayerConnectionID && room.BlackPlayer != "") {
+						console.log(TimeStamp() + "Game_Room[" + roomID + "] から userID:" + room.BlackPlayer + " が退出しました。");
+						var array = {
+							"roomID": roomID,
+							"BlackPlayer_userID": Game_Room[roomID].BlackPlayer,
+							"WhitePlayer_userID": Game_Room[roomID].WhitePlayer,
+							"isGame": true,
+							"status": "setsudan",
+							"result": Game_Room[roomID].WhitePlayer,
+						};
+						var SendData = JSON.stringify(array);
+						broadcast(SendData, roomID);
+						//白の勝ち
+						UpdateResult(1, 0, Game_Room[roomID].WhitePlayer);
+						UpdateResult(0, 1, Game_Room[roomID].BlackPlayer);
+
+						console.log(TimeStamp() + "Game_Room[" + obj.roomID + "] が開放されました。");
+						Game_Room[obj.roomID] = 0;
+						console.log(TimeStamp() + "Game_Room:" + JSON.stringify(Game_Room[roomID]));
+					}
+					if (connectionID == room.WhitePlayerConnectionID && room.WhitePlayer != "") {
+						console.log(TimeStamp() + "Game_Room[" + roomID + "] から userID:" + room.WhitePlayer + " が退出しました。");
+						var array = {
+							"roomID": roomID,
+							"BlackPlayer_userID": Game_Room[roomID].BlackPlayer,
+							"WhitePlayer_userID": Game_Room[roomID].WhitePlayer,
+							"isGame": true,
+							"status": "setsudan",
+							"result": Game_Room[roomID].BlackPlayer,
+						};
+						var SendData = JSON.stringify(array);
+						broadcast(SendData, roomID);
+						//黒の勝ち
+						UpdateResult(0, 1, Game_Room[roomID].WhitePlayer);
+						UpdateResult(1, 0, Game_Room[roomID].BlackPlayer);
+
+						console.log(TimeStamp() + "Game_Room[" + obj.roomID + "] が開放されました。");
+						Game_Room[obj.roomID] = 0;
+						console.log(TimeStamp() + "Game_Room:" + JSON.stringify(Game_Room[roomID]));
 					}
 				});
 			}
@@ -61,7 +105,6 @@ wss.on('connection', function (ws) {
 	//メッセージ受信時
 	ws.on('message', function (message) {
 		obj = JSON.parse(message);
-
 		if (obj.isWait) {
 			//待ちの人は待合室に追加する
 			var waitUser = {
@@ -108,7 +151,7 @@ wss.on('connection', function (ws) {
 						Game_Room[i] = roomData;
 						console.log(TimeStamp() + "Game_Room[" + i + "] に userID:" + roomData.BlackPlayer + " が入室しました。");
 						console.log(TimeStamp() + "Game_Room[" + i + "] に userID:" + roomData.WhitePlayer + " が入室しました。");
-						console.log(TimeStamp() + "Game_Room:" + JSON.stringify(roomData));
+						console.log(TimeStamp() + "Game_Room:" + JSON.stringify(Game_Room));
 						//代入したユーザを待合室から退出させる
 						for (var j = 0; j < Wait_Room.length; j++) {
 							if (Wait_Room[j].userID == roomData.BlackPlayer) {
@@ -118,6 +161,7 @@ wss.on('connection', function (ws) {
 								Wait_Room[j] = 0;
 							}
 						}
+						console.log(TimeStamp() + "Wait_Room:" + JSON.stringify(Wait_Room));
 						break;
 					}
 				}
@@ -175,6 +219,8 @@ wss.on('connection', function (ws) {
 						UpdateResult(1, 0, Game_Room[obj.roomID].BlackPlayer);
 					}
 					console.log(TimeStamp() + "Game_Room[" + obj.roomID + "] が開放されました。");
+					Game_Room[obj.roomID] = 0;
+					console.log(TimeStamp() + "Game_Room:" + JSON.stringify(Game_Room));
 				}
 			}
 		}
@@ -183,17 +229,38 @@ wss.on('connection', function (ws) {
 
 //ブロードキャスト
 function broadcast(message, roomID) {
+	var isBlack = true;
+	var isWhite = true;
+	for (var i = 0; i < connections.length; i++) {
+		if (i == Game_Room[roomID].BlackPlayerConnectionID) {
+			connections[i].send(message);
+			isBlack = false;
+		}
+		else if (i == Game_Room[roomID].WhitePlayerConnectionID) {
+			connections[i].send(message);
+			isWhite = false;
+		}
+
+		if (!isBlack && !isWhite) {
+			console.log(TimeStamp() + "Broadcast Game_Room[" + roomID + "]" + message);
+			break;
+		}
+	}
+	/*
 	connections.forEach(function (con, connectionID) {
-		if (connectionID == Game_Room[roomID].BlackPlayerConnectionID) {
+		if (connectionID == Game_Room[roomID].BlackPlayerConnectionID && isBlack) {
 			//console.log(TimeStamp() + "Send To BlackPlayer Game_Room[" + roomID + "]");
+			isBlack = false;
 			con.send(message);
 		}
-		if (connectionID == Game_Room[roomID].WhitePlayerConnectionID) {
+		if (connectionID == Game_Room[roomID].WhitePlayerConnectionID && isWhite) {
 			//console.log(TimeStamp() + "Send To WhitePlayer Game_Room[" + roomID + "]");
+			isWhite = false;
 			con.send(message);
 		}
 		console.log(TimeStamp() + "Broadcast Game_Room[" + roomID + "]" + message);
 	});
+	*/
 };
 
 //データ送信
